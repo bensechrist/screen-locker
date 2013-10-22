@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Screen Locker</string>
+    <string name="change_password">Change Password</string>
+    <string name="password">password</string>
+    <string name="delete_zone">Delete Zone</string>
+    <string name="delete_button">Delete Selected</string>
+    <string name="device_admin_receiver_description">This describes the device admin receiver</string>
+    
+    <string name="sample_device_admin_summary">Demonstration of a DeviceAdmin
+        class for administering the user\'s device.</string>
+    <string name="enable_admin">Enable Admin</string>
+
+</resources>
