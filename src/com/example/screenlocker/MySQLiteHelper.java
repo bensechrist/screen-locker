@@ -12,14 +12,14 @@ public class MySQLiteHelper extends SQLiteOpenHelper {
 
 	/***************** PROFILE TABLE SETUP ******************/
 	public static final String TABLE_ZONES = "unlock_zones";
-	public static final String COLUMN_MACADDR = "macaddress";
-	public static final String COLUMN_SSID = "ssid";
+	public static final String COLUMN_LATITUDE = "latitude";
+	public static final String COLUMN_LONGITUDE = "longitude";
 	public static final String COLUMN_ID = "id";
 
 	private static final String TABLE_ZONES_CREATE = 
 		"create table " + TABLE_ZONES + "(" 
 			+ COLUMN_ID + " integer primary key autoincrement, "
-			+ COLUMN_MACADDR + " string, " + COLUMN_SSID + " string);";
+			+ COLUMN_LATITUDE + " text, " + COLUMN_LONGITUDE + " text);";
 		
 	public MySQLiteHelper(Context context) {
 		super(context, DATABASE_NAME, null, DATABASE_VERSION);

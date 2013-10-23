@@ -42,31 +42,6 @@ public class MyWidgetProvider extends AppWidgetProvider {
 				int type = nInfo.getType();
 				switch (type) {
 				case ConnectivityManager.TYPE_WIFI:
-					wm = (WifiManager)context.getSystemService(Context.WIFI_SERVICE);
-					WifiInfo winfo = wm.getConnectionInfo();
-					String BSSID = winfo.getBSSID();
-					String SSID = winfo.getSSID();
-					Zone zone = new Zone();
-					zone.setMacAddr(BSSID);
-					if(zAdder.zoneExists(zone)) {
-						remoteViews.setTextViewText(R.id.update, SSID + "\n" + BSSID + "\nZone Exists");
-						Intent intent = new Intent(context, MyWidgetProvider.class);
-
-					    intent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-					    intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds);
-
-					    PendingIntent pendingIntent = PendingIntent.getBroadcast(context,
-					        0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-					    remoteViews.setOnClickPendingIntent(R.id.update, pendingIntent);
-					} else {
-						remoteViews.setTextViewText(R.id.update, SSID + "\n" + BSSID + "\nTap to Add Zone");
-						Intent intent = new Intent("com.screenlocker.widgetZoneAdded");
-						intent.putExtra("BSSIDfromWidget", BSSID);
-						intent.putExtra("SSIDfromWidget", SSID);
-						intent.putExtra("WidgetIds", appWidgetIds);
-						PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-						remoteViews.setOnClickPendingIntent(R.id.update, pendingIntent);
-					}
 					break;
 
 				default:

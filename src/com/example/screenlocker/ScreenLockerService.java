@@ -1,8 +1,5 @@
 package com.example.screenlocker;
 
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-
 import android.app.NotificationManager;
 import android.app.Service;
 import android.app.admin.DevicePolicyManager;
@@ -13,10 +10,12 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
-import android.net.wifi.WifiInfo;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.wifi.WifiManager;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
@@ -25,20 +24,20 @@ import android.widget.Toast;
 import com.example.screenlocker.MainActivity.Controller;
 import com.screenlocker.widget.MyWidgetProvider;
 
-public class ScreenLockerService extends Service {
+public class ScreenLockerService extends Service implements LocationListener {
 	
 	public static final String TOGGLE_ACTION = "com.screenlocker.toggleService";
 	public static final int notiId = 13;
 	public static final int requestCode = 13;
 	
-	private WifiManager wm;
-	private ConnectivityManager cm;
 	private BroadcastReceiver toggleReceiver;
-	private BroadcastReceiver wifistatechange;
+	private BroadcastReceiver addedZoneReceiver;
 	private BroadcastReceiver widgetReceiver;
 	private ZoneSQLiteAdder zAdder;
 	private SharedPreferences prefs;
 	private DevicePolicyManager DPM;
+	private LocationManager locationManager;
+	private String provider;
 	
 	@Override
 	public IBinder onBind(Intent intent) {
@@ -53,6 +52,13 @@ public class ScreenLockerService extends Service {
 	@Override
 	public void onCreate() {
 		super.onCreate();
+		
+		locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+		
+		Criteria criteria = new Criteria();
+		provider = locationManager.getBestProvider(criteria, false);
+		
+		locationManager.requestLocationUpdates(provider, 400, 1, this);
 		
 		prefs = getSharedPreferences(Controller.sharedprefs_key, Controller.pref_mode);
 		DPM = (DevicePolicyManager)getSystemService(Context.DEVICE_POLICY_SERVICE);
@@ -75,13 +81,12 @@ public class ScreenLockerService extends Service {
 			public void onReceive(Context context, Intent intent) {
 				zAdder = new ZoneSQLiteAdder(context);
 				zAdder.open();
-				String BSSID = intent.getExtras().getString("BSSIDfromWidget");
-				String SSID = intent.getExtras().getString("SSIDfromWidget");
 				int[] widgetIds = intent.getExtras().getIntArray("WidgetIds");
 				Zone newZone = new Zone();
-				newZone.setMacAddr(BSSID);
-				newZone.setSSID(SSID);
-				if(!zAdder.zoneExists(newZone)) {
+				newZone.setLatitude((long) 0);
+				newZone.setLongitude((long) 0);
+				Location location = new Location(LocationManager.NETWORK_PROVIDER);
+				if(!zAdder.zoneExists(location)) {
 					zAdder.addZone(newZone);
 					Intent addedIntent = new Intent("com.screenlocker.addedZone");
 					sendBroadcast(addedIntent);
@@ -96,75 +101,22 @@ public class ScreenLockerService extends Service {
 		registerReceiver(widgetReceiver, widgetFilter);
 		
 		IntentFilter ifilter = new IntentFilter();
-		ifilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
 		ifilter.addAction("com.screenlocker.addedZone");
-		wifistatechange = new BroadcastReceiver() {
+		addedZoneReceiver = new BroadcastReceiver() {
 			
 			@Override
 			public void onReceive(Context context, Intent intent) {
 				Log.i("receiver", "received it");
-				zAdder = new ZoneSQLiteAdder(getApplicationContext());
-				zAdder.open();
-				if (intent.getAction() == ConnectivityManager.CONNECTIVITY_ACTION) {
-					cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-					NetworkInfo nInfo = cm.getActiveNetworkInfo();
-					if (nInfo != null) {
-						int type = nInfo.getType();
-						switch (type) {
-						case ConnectivityManager.TYPE_WIFI:
-							wm = (WifiManager)getSystemService(WIFI_SERVICE);
-							WifiInfo winfo = wm.getConnectionInfo();
-							String macAddr = winfo.getMacAddress();
-							Zone temp = new Zone();
-							temp.setMacAddr(macAddr);
-							if(zAdder.zoneExists(temp))
-								unlockScreen();
-							else
-								setLockScreen();
-							break;
-		
-						default:
-							setLockScreen();
-							break;
-						}
-					} else
-						setLockScreen();
-				} else if (intent.getAction() == "com.screenlocker.addedZone") {
-					unlockScreen();
-				}
-				zAdder.close();
+				unlockScreen();
 			}
 		};
-		registerReceiver(wifistatechange, ifilter);
-		
-		IntentFilter lockFilter = new IntentFilter("com.screenlocker.lockscreen");
-		BroadcastReceiver lockScreen = new BroadcastReceiver() {
-			
-			@Override
-			public void onReceive(Context context, Intent intent) {
-				Controller.mDPM.lockNow();
-			}
-		};
-		registerReceiver(lockScreen, lockFilter);
-	}
-	
-	private void writeToFile(String data) {
-	    try {
-	        OutputStreamWriter outputStreamWriter = new OutputStreamWriter(openFileOutput("log.txt", 0));
-	        outputStreamWriter.write(data);
-	        outputStreamWriter.close();
-	    }
-	    catch (IOException e) {
-	        Log.e("Exception", "File write failed: " + e.toString());
-	    } 
+		registerReceiver(addedZoneReceiver, ifilter);
 	}
 	
 	private void unlockScreen(){
-		//Intent intent = new Intent("com.screenlocker.lockscreen");
-		//PendingIntent pIntent = PendingIntent.getBroadcast(getApplicationContext(), requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT);
 		NotificationCompat.Builder notiBuilder = new NotificationCompat.Builder(getApplicationContext());
 		notiBuilder.setContentTitle("Screen Locker").setContentText("Reenter Password at Lock Screen")
-			.setSmallIcon(R.drawable.ic_launcher); //.setContentIntent(pIntent);
+			.setSmallIcon(R.drawable.ic_launcher);
 		NotificationManager notiMan = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 		notiMan.notify(notiId, notiBuilder.build());
 		Editor editor = prefs.edit();
@@ -190,5 +142,35 @@ public class ScreenLockerService extends Service {
 	@Override
 	public void onDestroy() {
 		super.onDestroy();
+		locationManager.removeUpdates(this);
+	}
+
+	@Override
+	public void onLocationChanged(Location location) {
+		zAdder = new ZoneSQLiteAdder(getApplicationContext());
+		zAdder.open();
+		
+		if(zAdder.zoneExists(location)) {
+			unlockScreen();
+		} else
+			setLockScreen();
+		
+		zAdder.close();
+	}
+
+	@Override
+	public void onProviderDisabled(String provider) {
+		locationManager.removeUpdates(this);
+	}
+
+	@Override
+	public void onProviderEnabled(String provider) {
+		locationManager.requestLocationUpdates(provider, 400, 1, this);
+	}
+
+	@Override
+	public void onStatusChanged(String provider, int status, Bundle extras) {
+		// TODO Auto-generated method stub
+		
 	}
 }

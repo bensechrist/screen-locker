@@ -15,11 +15,14 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
-import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.InputType;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -80,15 +83,17 @@ public class MainActivity extends DeviceAdminReceiver {
      * <p>Note that this is implemented as an inner class only keep the sample
      * all together; typically this code would appear in some separate class.
      */
-    public static class Controller extends Activity {
+    public static class Controller extends Activity implements LocationListener {
         static final int RESULT_ENABLE = 1;
         
         private ZoneSQLiteAdder Zadder;
-    	private String macAddr;
-    	private String SSID;
-    	private WifiManager wm;
-    	private ConnectivityManager cm;
+    	private LocationManager locationManager;
     	private SharedPreferences prefs;
+    	private String provider;
+    	private TextView mTextv;
+    	private TextView numZones;
+    	private TextView mBSSID;
+    	private Button addZone;
     	public static final String sharedprefs_key = "com.screenlocker.sharedprefs";
     	public static final String pwd_key = "com.screenlocker.bluefishswim.underseacavern";
     	public static final String one_time_key = "com.screenlocker.firsttimesetpassword";
@@ -98,6 +103,9 @@ public class MainActivity extends DeviceAdminReceiver {
 
         public static DevicePolicyManager mDPM;
         public static ComponentName mDeviceAdminSample;
+        
+        private boolean createCalled = false;
+        private boolean resumeCalled = false;
 
         Button mEnableButton;
 
@@ -182,61 +190,44 @@ public class MainActivity extends DeviceAdminReceiver {
     			
     			setContentView(R.layout.activity_main);
     			
-    			cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-    			NetworkInfo wifiInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+    			locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
     			
-    			wm = (WifiManager) getSystemService(WIFI_SERVICE);
-    			SSID = "Wifi Disabled";
-    			if (wm.isWifiEnabled()) {
-	    			WifiInfo winfo = wm.getConnectionInfo();
-	    			if (wifiInfo.isConnected()){
-	    				macAddr = winfo.getMacAddress();
-	    				Log.i("Wifi State", "Enabled");
-	    			}
-	    			else
-	    				macAddr = null;
-	    			SSID = winfo.getSSID();
-    			}
+    			Criteria criteria = new Criteria();
+    			provider = locationManager.getBestProvider(criteria, false);
+    			Location location = locationManager.getLastKnownLocation(provider);
     			
-    			TextView mTextv = (TextView) findViewById(R.id.Router_Name);
-    			TextView numZones = (TextView) findViewById(R.id.Number_Zones);
-    			TextView mBSSID = (TextView) findViewById(R.id.Router_BSSID);
-    			Button addZone = (Button) findViewById(R.id.Add_Unlock_Zone_Button);
+    			mTextv = (TextView) findViewById(R.id.Router_Name);
+    			numZones = (TextView) findViewById(R.id.Number_Zones);
+    			mBSSID = (TextView) findViewById(R.id.Router_BSSID);
+    			addZone = (Button) findViewById(R.id.Add_Unlock_Zone_Button);
     			
     			curZones = Zadder.getZones();
     			numZones.setText(String.valueOf(curZones.size()));
     			
-    			if(macAddr != null){
-    				Zone temp = new Zone();
-    				temp.setMacAddr(macAddr);
-	    			if (Zadder.zoneExists(temp)){
-	    				addZone.setText("Zone Already Exists");
-	    				addZone.setEnabled(false);
-	    			}
-	    			mTextv.setText(SSID);
-	    			mBSSID.setText(macAddr);
+    			if(location != null){
+	    			mTextv.setText(String.valueOf(location.getLatitude()) + " " + String.valueOf(location.getLongitude()));
+	    			mBSSID.setText(provider);
 	    			
-	    			addZone.setOnClickListener(new OnClickListener() {
-	    				
-	    				@Override
-	    				public void onClick(View arg0) {
-	    					Log.i("Mac Address", macAddr);
-	    					Zone newZone = new Zone();
-	    					newZone.setMacAddr(macAddr);
-	    					newZone.setSSID(SSID);
-	    					if(!Zadder.zoneExists(newZone)) {
-	    						Zadder.addZone(newZone);
-	    						Intent addedIntent = new Intent("com.screenlocker.addedZone");
-	    						sendBroadcast(addedIntent);
-	    						Intent i = getBaseContext().getPackageManager()
-	    					             .getLaunchIntentForPackage( getBaseContext().getPackageName() );
-	    						i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-	    						startActivity(i);
-	    					}
-	    				}
-	    			});
+	    			if(Zadder.zoneExists(location)) {
+	    				addZone.setText("Zone Exists");
+	    				addZone.setEnabled(false);
+	    			} else {
+		    			addZone.setOnClickListener(new OnClickListener() {
+							
+							@Override
+							public void onClick(View v) {
+								Location clickedLocation = locationManager.getLastKnownLocation(provider);
+								Zone zone = new Zone();
+								zone.setLatitude(clickedLocation.getLatitude());
+								zone.setLongitude(clickedLocation.getLongitude());
+								Zadder.addZone(zone);
+							}
+						});
+	    			}
     			} else
-    				mTextv.setText("No Wifi Network Detected");
+    				mTextv.setText("Location not available");
+    			
+    			createCalled = true;
             }
 
         }
@@ -299,62 +290,31 @@ public class MainActivity extends DeviceAdminReceiver {
     			return true;
     			
     		case R.id.delete_zone :
-    			final List<Zone> zones = Zadder.getZones();
-    			String[] ssids = new String[zones.size()];
-    			for (int i=0; i<zones.size(); i++) {
-    				ssids[i] = zones.get(i).getSSID();
-    				ssids[i] += " - " + zones.get(i).getMacAddr();
-    				Log.i("Zone", zones.get(i).getSSID());
-    			}
-    			final ArrayList<Integer> selectedZones = new ArrayList<Integer>();;
-    			AlertDialog.Builder deleteBuilder = new Builder(Controller.this);
-    			deleteBuilder.setTitle("Select Zones to Delete");
-    			deleteBuilder.setMultiChoiceItems(ssids, null, new DialogInterface.OnMultiChoiceClickListener() {
-					
-					@Override
-					public void onClick(DialogInterface dialog, int which, boolean isChecked) {
-						if (!isChecked) {
-							selectedZones.remove(which);
-							Toast.makeText(Controller.this, zones.get(which).getSSID() + " unselected", Toast.LENGTH_SHORT).show();
-						} else if (isChecked){
-							selectedZones.add(which);
-							Toast.makeText(Controller.this, zones.get(which).getSSID() + " selected to delete", Toast.LENGTH_SHORT).show();
-						}
-					}
-				}).setPositiveButton(R.string.delete_button, new DialogInterface.OnClickListener() {
-					
-					@Override
-					public void onClick(DialogInterface dialog, int which) {
-						for (int i=0; i<selectedZones.size(); ++i) {
-							Zadder.removeZone(zones.get(selectedZones.get(i)));
-							Intent intent = getBaseContext().getPackageManager()
-   					             .getLaunchIntentForPackage( getBaseContext().getPackageName() );
-	   						intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-	   						startActivity(intent);
-						}
-					}
-				}).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-					
-					@Override
-					public void onClick(DialogInterface dialog, int which) {
-						selectedZones.clear();
-					}
-				});
-    			
-    			deleteBuilder.show();
         	}
         	return super.onMenuItemSelected(featureId, item);
         }
         
         @Override
         protected void onDestroy() {
-        	Zadder.close();
         	super.onDestroy();
+        	Zadder.close();
         }
 
         @Override
         protected void onResume() {
             super.onResume();
+            if (createCalled) {
+            	locationManager.requestLocationUpdates(provider, 400, 1, Controller.this);
+            	resumeCalled = true;
+            	
+            }
+        }
+        
+        @Override
+        protected void onPause() {
+        	super.onPause();
+        	if (resumeCalled)
+        		locationManager.removeUpdates(this);
         }
 
         @Override
@@ -386,6 +346,52 @@ public class MainActivity extends DeviceAdminReceiver {
                 startActivityForResult(intent, RESULT_ENABLE);
             }
         };
+
+		@Override
+		public void onLocationChanged(Location location) {
+			double lat = location.getLatitude();
+			double lng = location.getLongitude();
+			mTextv.setText(String.valueOf(lat) + " " + String.valueOf(lng));
+			mBSSID.setText(provider);
+			if(Zadder.zoneExists(location)) {
+				addZone.setText("Zone Exists");
+				addZone.setEnabled(false);
+			} else {
+				addZone.setText("Add Zone");
+				addZone.setEnabled(true);
+    			addZone.setOnClickListener(new OnClickListener() {
+					
+					@Override
+					public void onClick(View v) {
+						Location clickedLocation = locationManager.getLastKnownLocation(provider);
+						Zone zone = new Zone();
+						zone.setLatitude(clickedLocation.getLatitude());
+						zone.setLongitude(clickedLocation.getLongitude());
+						Zadder.addZone(zone);
+						Intent addedIntent = new Intent("com.screenlocker.addedZone");
+						sendBroadcast(addedIntent);
+					}
+				});
+			}
+		}
+
+		@Override
+		public void onProviderDisabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void onProviderEnabled(String provider) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void onStatusChanged(String provider, int status, Bundle extras) {
+			// TODO Auto-generated method stub
+			
+		}
 
     }
 }
