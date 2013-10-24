@@ -14,7 +14,6 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
@@ -58,7 +57,7 @@ public class ScreenLockerService extends Service implements LocationListener {
 		Criteria criteria = new Criteria();
 		provider = locationManager.getBestProvider(criteria, false);
 		
-		locationManager.requestLocationUpdates(provider, 400, 1, this);
+		locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 1000, 100, this);
 		
 		prefs = getSharedPreferences(Controller.sharedprefs_key, Controller.pref_mode);
 		DPM = (DevicePolicyManager)getSystemService(Context.DEVICE_POLICY_SERVICE);
@@ -165,7 +164,7 @@ public class ScreenLockerService extends Service implements LocationListener {
 
 	@Override
 	public void onProviderEnabled(String provider) {
-		locationManager.requestLocationUpdates(provider, 400, 1, this);
+		locationManager.requestLocationUpdates(provider, 1000, 100, this);
 	}
 
 	@Override

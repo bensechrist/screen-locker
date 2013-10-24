@@ -1,6 +1,5 @@
 package com.example.screenlocker;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import android.app.Activity;
@@ -19,10 +18,7 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.net.ConnectivityManager;
-import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.text.InputType;
 import android.util.Log;
 import android.view.KeyEvent;
