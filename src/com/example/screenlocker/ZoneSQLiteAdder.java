@@ -74,17 +74,18 @@ public class ZoneSQLiteAdder {
 	}
 	
 	public boolean zoneExists(Location location) {
-		Cursor cursor = database.query(MySQLiteHelper.TABLE_ZONES, allZonecolumns, MySQLiteHelper.COLUMN_LATITUDE + "<=? OR " + MySQLiteHelper.COLUMN_LATITUDE + ">=? AND " + MySQLiteHelper.COLUMN_LONGITUDE + "<=? OR " + MySQLiteHelper.COLUMN_LONGITUDE + ">=?", new String[]{String.valueOf(location.getLatitude()+0.000450), String.valueOf(location.getLatitude()-0.000450), String.valueOf(location.getLongitude()+0.000450), String.valueOf(location.getLongitude()-0.000450)}, null, null, null);
-		cursor.moveToLast();
-		int count = cursor.getCount();
-		if (count == 0) {
-			Log.i("false", "no zone exists");
-			return false;
+		List<Zone> zones = getZones();
+		for(int i=0; i<zones.size(); ++i) {
+			Location dest = new Location(location);
+			dest.setLatitude(zones.get(i).getLatitude());
+			dest.setLongitude(zones.get(i).getLongitude());
+			if(location.distanceTo(dest) < 50) {
+				Log.i("true", "zone exists");
+				return true;
+			}
 		}
-		else {
-			Log.i("true", "zone exists");
-			return true;
-		}
+		Log.i("false", "zone doesn't exist");
+		return false;
 	}
 	
 	public void removeZone(Zone zone) {

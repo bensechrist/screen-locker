@@ -10,7 +10,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
-import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -36,7 +35,6 @@ public class ScreenLockerService extends Service implements LocationListener {
 	private SharedPreferences prefs;
 	private DevicePolicyManager DPM;
 	private LocationManager locationManager;
-	private String provider;
 	
 	@Override
 	public IBinder onBind(Intent intent) {
@@ -53,9 +51,6 @@ public class ScreenLockerService extends Service implements LocationListener {
 		super.onCreate();
 		
 		locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-		
-		Criteria criteria = new Criteria();
-		provider = locationManager.getBestProvider(criteria, false);
 		
 		locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 1000, 100, this);
 		
@@ -159,12 +154,12 @@ public class ScreenLockerService extends Service implements LocationListener {
 
 	@Override
 	public void onProviderDisabled(String provider) {
-		locationManager.removeUpdates(this);
+
 	}
 
 	@Override
 	public void onProviderEnabled(String provider) {
-		locationManager.requestLocationUpdates(provider, 1000, 100, this);
+
 	}
 
 	@Override
